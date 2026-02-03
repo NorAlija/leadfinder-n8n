@@ -3,6 +3,8 @@
 
 A simple Telegram bot that lets you scrape local businesses directly from chat.
 
+Screenshots can be found in documents/. The screenshot of the telegram bot result is blurred, respecting the privacy.
+
 Send a message like:
 
 cafes in helsinki 5
