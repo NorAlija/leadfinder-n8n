@@ -1,0 +1,540 @@
+{
+  "name": "Lead finder",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        560,
+        0
+      ],
+      "id": "6cf65667-6f3f-420c-b2d3-d5cecf1623af",
+      "name": "Telegram Trigger",
+      "webhookId": "0e7d363a-eefe-4e0e-8e1d-18b3ed654a9a",
+      "credentials": {
+        "telegramApi": {
+          "id": "aMP6HQ7xWcs5auNX",
+          "name": "Agency"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.apify.com/v2/acts/compass~crawler-google-places/run-sync-get-dataset-items",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "token",
+              "value": "Your apify token"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"searchStringsArray\": [\"{{$json.what.trim()}}\"],\n  \"locationQuery\": \"{{$json.where.trim()}}\",\n  \"maxCrawledPlacesPerSearch\": {{ $json.limit }},\n  \"language\": \"en\",\n  \"maximumLeadsEnrichmentRecords\": 0,\n  \"maxImages\": 0\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1488,
+        -320
+      ],
+      "id": "1cdd5889-c137-4687-91ce-d97f5da20ac7",
+      "name": "Get information num,place"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Collect all incoming items (each item is a place object in your case)\nconst places = $input.all().map(i => i.json);\n\n// Keep only the fields you want\nconst clean = places.map(p => ({\n  title: p.title || \"Unknown\",\n  city: p.city || \"\",\n  address: p.address || \"\",\n  website: p.website || \"\",\n  phone: p.phone || \"\",\n}));\n\n// Limit results so Telegram message doesn't get huge\nconst topN = 10;\nconst top = clean.slice(0, topN);\n\n// Build Telegram-friendly text\nconst lines = top.map((p, idx) => {\n  const parts = [\n    `${idx + 1}) ${p.title}`,\n    p.city ? `🏙️ ${p.city}` : null,\n    p.address ? `📍 ${p.address}` : null,\n    p.phone ? `📞 ${p.phone}` : null,\n    p.website ? `🌐 ${p.website}` : null,\n  ].filter(Boolean);\n\n  return parts.join(\"\\n\");\n}).join(\"\\n\\n\");\n\nreturn [{\n  json: {\n    reply: `Found ${clean.length} results\\nShowing top ${Math.min(topN, clean.length)}:\\n\\n${lines || \"No results.\"}`\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1600,
+        -480
+      ],
+      "id": "3c38ecb5-0d4d-4145-b9b8-27a0c5ecc630",
+      "name": "Return relevant information"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c13dbf00-773f-4147-9e7d-33d58a3309e7",
+              "name": "chatId",
+              "value": "={{ $json.message.chat.id }}",
+              "type": "number"
+            },
+            {
+              "id": "eb685e3d-cbff-495b-960b-689987046612",
+              "name": "userText",
+              "value": "={{ $json.message.text }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        752,
+        0
+      ],
+      "id": "df05f909-7937-45fc-8658-22b7aefb1d7a",
+      "name": "Set context"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Set context').item.json.chatId }}",
+        "text": "Your message has to start with \"scrape:\"",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1168,
+        144
+      ],
+      "id": "1052489f-835b-4994-b74d-962838bd55de",
+      "name": "Message has to start with \"scrape:\"",
+      "webhookId": "4554212a-1978-4ad7-9906-b7297a064b92",
+      "credentials": {
+        "telegramApi": {
+          "id": "aMP6HQ7xWcs5auNX",
+          "name": "Agency"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{$json.message.chat.id}}",
+        "text": "Please include a location like: scrape: cafes in helsinki",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1488,
+        16
+      ],
+      "id": "e90fd1f1-8a85-4f31-a75c-ba0942b804f8",
+      "name": "Include Location",
+      "webhookId": "c20e1dee-3173-4c8b-acb7-73a8a2c391ea",
+      "credentials": {
+        "telegramApi": {
+          "id": "aMP6HQ7xWcs5auNX",
+          "name": "Agency"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{$node[\"Set context\"].json.chatId}}\n",
+        "text": "={{$json.reply}}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1792,
+        -480
+      ],
+      "id": "88b28360-20f9-4d69-a1ee-312cb49416b9",
+      "name": "Return result",
+      "webhookId": "efe83f54-ae6e-4f14-8fbe-5f7a6e0efc2c",
+      "credentials": {
+        "telegramApi": {
+          "id": "aMP6HQ7xWcs5auNX",
+          "name": "Agency"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "309a26a0-d42f-409c-b0ec-1343f7becaf4",
+              "leftValue": "={{ $json.userText }}",
+              "rightValue": "scrape: ",
+              "operator": {
+                "type": "string",
+                "operation": "startsWith"
+              }
+            },
+            {
+              "id": "a297fb15-56ca-4835-bd4a-cac18fd19a8a",
+              "leftValue": "📌 How to use this bot",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        944,
+        0
+      ],
+      "id": "e081f75e-8da3-49ad-99af-558a6a932ae4",
+      "name": "If message starts with scrape:"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "9745ff68-9cc0-4ba1-b3bd-7fb487352eb5",
+              "leftValue": "={{ $json.where }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1376,
+        -144
+      ],
+      "id": "635c657f-e8e3-4af7-8d2f-68aa01206105",
+      "name": "If location is true"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "fe6c9148-b4f0-4ce0-b2aa-14577ab98b71",
+              "name": "query",
+              "value": "={{ $('Telegram Trigger').item.json.message.text }}",
+              "type": "string"
+            },
+            {
+              "id": "3542e615-1b73-4610-ac48-8a224458cb2b",
+              "name": "where",
+              "value": "={{ (() => { let q=$node[\"Set context\"].json.userText.replace(/^scrape:\\s*/i,'').trim(); q=q.replace(/\\s+\\d+\\s*$/,'').trim(); const m=q.match(/\\s+in\\s+(.+)$/i); return m ? m[1].trim() : \"\"; })() }}\n",
+              "type": "string"
+            },
+            {
+              "id": "6025e521-3b03-4dd3-93cf-14e53e592a5a",
+              "name": "what",
+              "value": "={{ (() => { let q=$node[\"Set context\"].json.userText.replace(/^scrape:\\s*/i,'').trim(); q=q.replace(/\\s+\\d+\\s*$/,'').trim(); return q.replace(/\\s+in\\s+(.+)$/i,'').trim(); })() }}\n",
+              "type": "string"
+            },
+            {
+              "id": "6aed918a-7115-477a-a602-f54dbaebe1d0",
+              "name": "limit",
+              "value": "={{ (() => { const q=$node[\"Set context\"].json.userText.replace(/^scrape:\\s*/i,'').trim(); const m=q.match(/(\\d+)\\s*$/); if(!m) return 5; const n=parseInt(m[1],10); return Math.min(Math.max(n,1),20); })() }}\n",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1168,
+        -144
+      ],
+      "id": "a8f1bff1-5e87-4020-a2cb-abbc1243581b",
+      "name": "Set context1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const places = $input.all().map(i => i.json);\n\n// choose how many you want to save (can be your limit)\nconst limit = $node[\"Set context1\"].json.limit ?? 5; // change \"Parse\" to your parsing node name\nconst top = places.slice(0, limit);\n\nreturn top.map(p => ({\n  json: {\n    Title: p.title || \"\",\n    City: p.city || \"\",\n    Address: p.address || \"\",\n    Phone: p.phone ? `'${p.phone}` : \"\",\n    Website: p.website || \"\",\n    PlaceId: p.placeId || \"\",\n    Contacted: \"\"\n  }\n}));\n\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1600,
+        -144
+      ],
+      "id": "cfd5a1df-c905-4ca2-8737-d06092c6d3cf",
+      "name": "Prepare rows for Sheets"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1xQEXIV9sJFeQBY0sYxw2yILumdN-VUU8F4qtaGie7qQ",
+          "mode": "list",
+          "cachedResultName": "Lead finder",
+          "cachedResultUrl": "Your google sheet"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "Your google sheet"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Title": "={{$json.Title}}",
+            "City": "={{$json.City}}",
+            "Address": "={{$json.Address}}",
+            "Phone": "={{$json.Phone}}",
+            "Website": "={{$json.Website}}",
+            "PlaceId": "={{$json.PlaceId}}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Title",
+              "displayName": "Title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "City",
+              "displayName": "City",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Address",
+              "displayName": "Address",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Phone",
+              "displayName": "Phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Website",
+              "displayName": "Website",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "PlaceId",
+              "displayName": "PlaceId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Contacted",
+              "displayName": "Contacted",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1808,
+        -144
+      ],
+      "id": "5cb21a80-50be-471f-b7a9-0f99690627bd",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "yogvWs11uUb1uzZo",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get information num,place": {
+      "main": [
+        [
+          {
+            "node": "Return relevant information",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Prepare rows for Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Return relevant information": {
+      "main": [
+        [
+          {
+            "node": "Return result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set context": {
+      "main": [
+        [
+          {
+            "node": "If message starts with scrape:",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If message starts with scrape:": {
+      "main": [
+        [
+          {
+            "node": "Set context1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Message has to start with \"scrape:\"",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If location is true": {
+      "main": [
+        [
+          {
+            "node": "Get information num,place",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Include Location",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set context1": {
+      "main": [
+        [
+          {
+            "node": "If location is true",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Return result": {
+      "main": [
+        []
+      ]
+    },
+    "Prepare rows for Sheets": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "5871bfc2-52ec-4f65-98b3-d026616753a6",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "8f6659828b5563983053c18d306a415776f9e363ffb42a68d0b9682ed34f943f"
+  },
+  "id": "LD1xrjugNMvGoZLX4ETNc",
+  "tags": []
+}
