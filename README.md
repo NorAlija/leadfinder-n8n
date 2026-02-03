@@ -1,4 +1,4 @@
-````markdown
+
 # Telegram Business Scraper Bot (n8n + Apify)
 
 A simple Telegram bot that lets you scrape local businesses directly from chat.
